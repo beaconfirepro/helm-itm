@@ -1,5 +1,10 @@
 # beacon-platform
 
+> **⚠ Interim home.** This monorepo currently lives in the `beaconfirepro/helm-itm` repo for
+> tooling-access reasons. It will be **renamed/moved to `beaconfirepro/beacon-platform`** once
+> that repo is reachable from the build environment. The name "helm-itm" here is incidental — do
+> not treat this as the ITM module.
+
 The Beacon platform monorepo. **Products** (LiensEasy, Helm) are built from **Tower** (the
 shared platform — auth, one design system, one multi-tenant Postgres, module gating) plus a set
 of **modules**. See **`docs/ARCHITECTURE.md`** for the canonical model and locked stack.
