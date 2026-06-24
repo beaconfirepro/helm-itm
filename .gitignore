@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+coverage/
+
+# env / secrets — never commit
+.env
+.env.*
+!.env.example
+
+# prisma generated client
+**/generated/
+.DS_Store

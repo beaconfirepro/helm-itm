@@ -1,0 +1,970 @@
+// LienGuard — Prisma schema (first-pass translation from Drizzle)
+// Source: lib/db/src/schema/{enums,tables}.ts
+// Auth/session tables (lib/db/src/schema/auth.ts) intentionally SKIPPED — see notes at bottom.
+// Physical names preserved via @@map / @map so this binds to the EXISTING database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums (27)
+// ---------------------------------------------------------------------------
+
+enum LienWorkflowType {
+  residential_sub
+  commercial_sub
+  public_bond
+  none
+
+  @@map("lien_workflow_type")
+}
+
+enum ContractorTier {
+  first_tier
+  second_tier
+
+  @@map("contractor_tier")
+}
+
+enum LienClockTrigger {
+  none
+  design_start
+  field_work_start
+
+  @@map("lien_clock_trigger")
+}
+
+enum WorkStream {
+  construction
+  design
+
+  @@map("work_stream")
+}
+
+enum LienScheduleOfValuesStatus {
+  open
+  at_risk
+  notice_active
+  filing
+  filed
+  released
+  closed
+  lapsed
+
+  @@map("lien_schedule_of_values_status")
+}
+
+enum RuleKind {
+  notice
+  filing
+  retainage
+  post_filing_notice
+  enforcement
+  release
+
+  @@map("rule_kind")
+}
+
+enum BusinessDayHandling {
+  next_business_day
+  exact
+
+  @@map("business_day_handling")
+}
+
+enum NoticeType {
+  early_warning
+  statutory_claim
+  retainage_claim
+
+  @@map("notice_type")
+}
+
+enum NoticeStatus {
+  draft
+  approved
+  sent
+  delivered
+
+  @@map("notice_status")
+}
+
+enum NoticeRecipientType {
+  owner
+  original_contractor
+
+  @@map("notice_recipient_type")
+}
+
+enum WaiverType {
+  conditional_progress
+  unconditional_progress
+  conditional_final
+  unconditional_final
+
+  @@map("waiver_type")
+}
+
+enum WaiverApprovalStatus {
+  not_required
+  pending_pm
+  pending_pm_finance
+  approved
+  rejected
+
+  @@map("waiver_approval_status")
+}
+
+enum FilingStatus {
+  not_filed
+  compliance_check
+  affidavit_draft
+  exported
+  filed
+  post_filing_notice_sent
+
+  @@map("filing_status")
+}
+
+enum ReleaseStatus {
+  not_required
+  requested
+  generated
+  signed
+  filed
+
+  @@map("release_status")
+}
+
+enum PartyRelationType {
+  owner
+  original_contractor
+  hiring_party
+
+  @@map("party_relation_type")
+}
+
+enum HoldType {
+  schedule_hold
+  material_hold
+
+  @@map("hold_type")
+}
+
+enum SupplierNoticeRiskStatus {
+  none
+  flagged
+  cleared
+
+  @@map("supplier_notice_risk_status")
+}
+
+enum CollectionStatus {
+  current
+  overdue
+  in_collections
+  promised
+  payment_plan
+  escalated
+  written_off
+  resolved
+
+  @@map("collection_status")
+}
+
+enum EscalationStage {
+  none
+  soft_collections
+  pre_lien_notice
+  lien_filing
+  agency_attorney
+  write_off
+
+  @@map("escalation_stage")
+}
+
+enum DunningStepType {
+  reminder
+  statement
+  call
+  final_demand
+
+  @@map("dunning_step_type")
+}
+
+enum PromiseStatus {
+  open
+  kept
+  broken
+  cancelled
+
+  @@map("promise_status")
+}
+
+enum PaymentPlanStatus {
+  active
+  completed
+  defaulted
+  cancelled
+
+  @@map("payment_plan_status")
+}
+
+enum CollectionActivityMethod {
+  email
+  phone
+  letter
+  sms
+  portal
+  in_person
+
+  @@map("collection_activity_method")
+}
+
+enum IntegrationSource {
+  hubspot
+  connecteam
+  qbo
+
+  @@map("integration_source")
+}
+
+enum SyncStatus {
+  pending
+  synced
+  error
+
+  @@map("sync_status")
+}
+
+// ---------------------------------------------------------------------------
+// Organization (platform root)
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id
+  name      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("organizations")
+}
+
+// ---------------------------------------------------------------------------
+// 2.1 Integration / Link Models
+// ---------------------------------------------------------------------------
+
+model LinkedClient {
+  id                       String    @id @default(uuid())
+  orgId                    String    @map("org_id")
+  hubspotCompanyId         String    @map("hubspot_company_id")
+  hubspotContactId         String?   @map("hubspot_contact_id")
+  qboCustomerId            String?   @map("qbo_customer_id")
+  cachedName               String    @map("cached_name")
+  cachedEmail              String?   @map("cached_email")
+  cachedPhone              String?   @map("cached_phone")
+  paymentTermsDays         Int       @default(30) @map("payment_terms_days")
+  requiresNotarizedWaivers Boolean   @default(false) @map("requires_notarized_waivers")
+  matchState               String    @default("matched") @map("match_state")
+  lastSyncedAt             DateTime? @map("last_synced_at") @db.Timestamptz
+  createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  collectionAccount CollectionAccount?
+  holds             Hold[]
+
+  @@unique([orgId, hubspotCompanyId], map: "linked_clients_org_hubspot_idx")
+  @@index([orgId], map: "linked_clients_org_id_idx")
+  @@map("linked_clients")
+}
+
+model SyncJob {
+  id         String            @id @default(uuid())
+  orgId      String            @map("org_id")
+  source     IntegrationSource
+  entity     String
+  status     SyncStatus        @default(pending)
+  startedAt  DateTime?         @map("started_at") @db.Timestamptz
+  finishedAt DateTime?         @map("finished_at") @db.Timestamptz
+  error      String?
+  payload    Json?
+  createdAt  DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([orgId], map: "sync_jobs_org_id_idx")
+  @@map("sync_jobs")
+}
+
+// ---------------------------------------------------------------------------
+// 2.2 Reference Models
+// ---------------------------------------------------------------------------
+
+model Department {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  systemTypes SystemType[]
+
+  @@index([orgId], map: "departments_org_id_idx")
+  @@map("departments")
+}
+
+model SystemType {
+  id           String   @id @default(uuid())
+  orgId        String   @map("org_id")
+  name         String
+  departmentId String   @map("department_id")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  department     Department      @relation(fields: [departmentId], references: [id])
+  subSystemTypes SubSystemType[]
+
+  @@index([orgId], map: "system_types_org_id_idx")
+  @@index([departmentId], map: "system_types_department_id_idx")
+  @@map("system_types")
+}
+
+model SubSystemType {
+  id               String           @id @default(uuid())
+  orgId            String           @map("org_id")
+  name             String
+  systemTypeId     String           @map("system_type_id")
+  lienWorkflowType LienWorkflowType @map("lien_workflow_type")
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  systemType   SystemType    @relation(fields: [systemTypeId], references: [id])
+  lienProjects LienProject[]
+
+  @@index([orgId], map: "sub_system_types_org_id_idx")
+  @@index([systemTypeId], map: "sub_system_types_system_type_id_idx")
+  @@map("sub_system_types")
+}
+
+model StageTriggerConfig {
+  id               String           @id @default(uuid())
+  orgId            String           @map("org_id")
+  hubspotStageKey  String           @map("hubspot_stage_key")
+  label            String
+  lienClockTrigger LienClockTrigger @default(none) @map("lien_clock_trigger")
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([orgId, hubspotStageKey], map: "stage_triggers_org_stage_key_idx")
+  @@index([orgId], map: "stage_triggers_org_id_idx")
+  @@map("stage_trigger_configs")
+}
+
+// ---------------------------------------------------------------------------
+// 2.3 Jurisdiction Rules Engine
+// ---------------------------------------------------------------------------
+
+model Jurisdiction {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  code      String
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  ruleSets     LienRuleSet[]
+  lienProjects LienProject[]
+
+  @@unique([orgId, code], map: "jurisdictions_org_code_idx")
+  @@index([orgId], map: "jurisdictions_org_id_idx")
+  @@map("jurisdictions")
+}
+
+model LienRuleSet {
+  id             String   @id @default(uuid())
+  orgId          String   @map("org_id")
+  jurisdictionId String   @map("jurisdiction_id")
+  version        String
+  effectiveDate  DateTime @map("effective_date") @db.Timestamptz
+  statuteRef     String   @map("statute_ref")
+  legalReviewed  Boolean  @default(false) @map("legal_reviewed")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  jurisdiction Jurisdiction @relation(fields: [jurisdictionId], references: [id])
+  rules        LienRule[]
+
+  @@index([orgId], map: "lien_rule_sets_org_id_idx")
+  @@index([jurisdictionId], map: "lien_rule_sets_jurisdiction_id_idx")
+  @@map("lien_rule_sets")
+}
+
+model LienRule {
+  id                   String              @id @default(uuid())
+  orgId                String              @map("org_id")
+  ruleSetId            String              @map("rule_set_id")
+  lienWorkflowType     LienWorkflowType    @map("lien_workflow_type")
+  workStream           WorkStream          @map("work_stream")
+  ruleKind             RuleKind            @map("rule_kind")
+  anchor               String
+  offsetMonths         Int?                @map("offset_months")
+  offsetDayOfMonth     Int?                @map("offset_day_of_month")
+  offsetDays           Int?                @map("offset_days")
+  offsetIsBusinessDays Boolean             @default(false) @map("offset_is_business_days")
+  businessDayHandling  BusinessDayHandling @default(next_business_day) @map("business_day_handling")
+  statuteCitation      String              @map("statute_citation")
+  description          String
+  createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  ruleSet       LienRuleSet    @relation(fields: [ruleSetId], references: [id])
+  lienDeadlines LienDeadline[]
+
+  @@index([orgId], map: "lien_rules_org_id_idx")
+  @@index([ruleSetId], map: "lien_rules_rule_set_id_idx")
+  @@map("lien_rules")
+}
+
+// ---------------------------------------------------------------------------
+// 2.4 Lien Tracking Models
+// ---------------------------------------------------------------------------
+
+model LienProject {
+  id                          String     @id @default(uuid())
+  orgId                       String     @map("org_id")
+  hubspotProjectId            String     @map("hubspot_project_id")
+  jurisdictionId              String     @map("jurisdiction_id")
+  subSystemTypeId             String     @map("sub_system_type_id")
+  lienWorkflowType            LienWorkflowType @map("lien_workflow_type")
+  contractorTier              ContractorTier   @default(first_tier) @map("contractor_tier")
+  legalPropertyAddress        String?    @map("legal_property_address")
+  county                      String?
+  contractStartDate           DateTime?  @map("contract_start_date") @db.Timestamptz
+  completionDate              DateTime?  @map("completion_date") @db.Timestamptz
+  cachedProjectName           String?    @map("cached_project_name")
+  cachedHubspotStatus         String?    @map("cached_hubspot_status")
+  completionChecklistComplete Boolean    @default(false) @map("completion_checklist_complete")
+  lastSyncedAt                DateTime?  @map("last_synced_at") @db.Timestamptz
+  createdAt                   DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                   DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  jurisdiction        Jurisdiction          @relation(fields: [jurisdictionId], references: [id])
+  subSystemType       SubSystemType         @relation(fields: [subSystemTypeId], references: [id])
+  invoiceLinks        InvoiceLink[]
+  timesheetLinks      TimesheetLink[]
+  projectPartyLinks   ProjectPartyLink[]
+  scheduleOfValues    LienScheduleOfValue[]
+  waivers             Waiver[]
+  supplierNoticeRisks SupplierNoticeRisk[]
+  holds               Hold[]
+
+  @@unique([orgId, hubspotProjectId], map: "lien_projects_org_hubspot_idx")
+  @@index([orgId], map: "lien_projects_org_id_idx")
+  @@map("lien_projects")
+}
+
+model InvoiceLink {
+  id                   String    @id @default(uuid())
+  orgId                String    @map("org_id")
+  lienProjectId        String?   @map("lien_project_id")
+  linkedClientId       String?   @map("linked_client_id")
+  qboInvoiceId         String?   @map("qbo_invoice_id")
+  qboSupplierInvoiceId String?   @map("qbo_supplier_invoice_id")
+  isSupplierInvoice    Boolean   @default(false) @map("is_supplier_invoice")
+  amount               Decimal   @db.Decimal(12, 2)
+  invoiceDate          DateTime  @map("invoice_date") @db.Timestamptz
+  dueDate              DateTime  @map("due_date") @db.Timestamptz
+  qboStatus            String    @map("qbo_status")
+  clearedFlag          Boolean   @default(false) @map("cleared_flag")
+  clearedAt            DateTime? @map("cleared_at") @db.Timestamptz
+  clearedByUserId      String?   @map("cleared_by_user_id") // Clerk user id (was loose ref to users; no FK in Drizzle)
+  lastSyncedAt         DateTime? @map("last_synced_at") @db.Timestamptz
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  lienProject LienProject? @relation(fields: [lienProjectId], references: [id])
+
+  @@index([orgId], map: "invoice_links_org_id_idx")
+  @@index([lienProjectId], map: "invoice_links_lien_project_id_idx")
+  @@map("invoice_links")
+}
+
+model TimesheetLink {
+  id                     String     @id @default(uuid())
+  orgId                  String     @map("org_id")
+  lienProjectId          String     @map("lien_project_id")
+  connecteamUserId       String     @map("connecteam_user_id")
+  connecteamTimeRecordId String     @map("connecteam_time_record_id")
+  displayName            String?    @map("display_name")
+  stageTag               String     @map("stage_tag")
+  workStream             WorkStream @map("work_stream")
+  hours                  Decimal    @db.Decimal(6, 2)
+  workDate               DateTime   @map("work_date") @db.Timestamptz
+  lastSyncedAt           DateTime?  @map("last_synced_at") @db.Timestamptz
+  createdAt              DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  lienProject LienProject @relation(fields: [lienProjectId], references: [id])
+
+  @@unique([orgId, connecteamTimeRecordId], map: "timesheet_links_org_record_idx")
+  @@index([orgId], map: "timesheet_links_org_id_idx")
+  @@index([lienProjectId], map: "timesheet_links_lien_project_id_idx")
+  @@map("timesheet_links")
+}
+
+model ProjectPartyLink {
+  id                   String            @id @default(uuid())
+  orgId                String            @map("org_id")
+  lienProjectId        String            @map("lien_project_id")
+  partyRelationType    PartyRelationType @map("party_relation_type")
+  hubspotCompanyId     String            @map("hubspot_company_id")
+  cachedLegalName      String            @map("cached_legal_name")
+  cachedMailingAddress String?           @map("cached_mailing_address")
+  lastSyncedAt         DateTime?         @map("last_synced_at") @db.Timestamptz
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  lienProject LienProject @relation(fields: [lienProjectId], references: [id])
+
+  @@index([orgId], map: "project_party_links_org_id_idx")
+  @@index([lienProjectId], map: "project_party_links_lien_project_id_idx")
+  @@map("project_party_links")
+}
+
+model LienScheduleOfValue {
+  id            String                     @id @default(uuid())
+  orgId         String                     @map("org_id")
+  lienProjectId String                     @map("lien_project_id")
+  workStream    WorkStream                 @map("work_stream")
+  status        LienScheduleOfValuesStatus @default(open)
+  openedAt      DateTime                   @map("opened_at") @db.Timestamptz
+  createdAt     DateTime                   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime                   @updatedAt @map("updated_at") @db.Timestamptz
+
+  lienProject LienProject  @relation(fields: [lienProjectId], references: [id])
+  workMonths  WorkMonth[]
+  notices     Notice[]
+  filing      LienFiling?
+
+  @@index([orgId], map: "lien_schedule_of_values_org_id_idx")
+  @@index([lienProjectId], map: "lien_schedule_of_values_lien_project_id_idx")
+  @@map("lien_schedule_of_values")
+}
+
+model WorkMonth {
+  id                     String   @id @default(uuid())
+  orgId                  String   @map("org_id")
+  lienScheduleOfValuesId String   @map("lien_schedule_of_values_id")
+  month                  DateTime @db.Timestamptz
+  derivedOverdue         Boolean  @default(false) @map("derived_overdue")
+  clearedFlag            Boolean  @default(false) @map("cleared_flag")
+  invoiceLinkId          String?  @map("invoice_link_id") // loose ref to invoice_links (no FK in Drizzle)
+  createdAt              DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  scheduleOfValues LienScheduleOfValue @relation(fields: [lienScheduleOfValuesId], references: [id])
+  lienDeadlines    LienDeadline[]
+  notices          Notice[]
+
+  @@unique([orgId, lienScheduleOfValuesId, month], map: "work_months_org_schedule_of_values_month_idx")
+  @@index([lienScheduleOfValuesId], map: "work_months_lien_schedule_of_values_id_idx")
+  @@map("work_months")
+}
+
+model LienDeadline {
+  id              String    @id @default(uuid())
+  orgId           String    @map("org_id")
+  workMonthId     String    @map("work_month_id")
+  ruleId          String    @map("rule_id")
+  ruleKind        RuleKind  @map("rule_kind")
+  computedDate    DateTime  @map("computed_date") @db.Timestamptz
+  adjustedDate    DateTime  @map("adjusted_date") @db.Timestamptz
+  sourceData      Json      @map("source_data")
+  satisfiedAt     DateTime? @map("satisfied_at") @db.Timestamptz
+  isOverridden    Boolean   @default(false) @map("is_overridden")
+  overrideDate    DateTime? @map("override_date") @db.Timestamptz
+  overrideByUserId String?  @map("override_by_user_id") // Clerk user id (was loose ref to users; no FK in Drizzle)
+  overrideAt      DateTime? @map("override_at") @db.Timestamptz
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  workMonth WorkMonth @relation(fields: [workMonthId], references: [id])
+  rule      LienRule  @relation(fields: [ruleId], references: [id])
+
+  @@index([orgId], map: "lien_deadlines_org_id_idx")
+  @@index([workMonthId], map: "lien_deadlines_work_month_id_idx")
+  @@map("lien_deadlines")
+}
+
+model Notice {
+  id                     String       @id @default(uuid())
+  orgId                  String       @map("org_id")
+  lienScheduleOfValuesId String       @map("lien_schedule_of_values_id")
+  workMonthId            String?      @map("work_month_id")
+  noticeType             NoticeType   @map("notice_type")
+  status                 NoticeStatus @default(draft)
+  claimAmount            Decimal      @map("claim_amount") @db.Decimal(12, 2)
+  workDescription        String?      @map("work_description")
+  monthListed            DateTime     @map("month_listed") @db.Timestamptz
+  generatedDocUrl        String?      @map("generated_doc_url")
+  approvedByUserId       String?      @map("approved_by_user_id") // Clerk user id (was loose ref to users; no FK in Drizzle)
+  approvedAt             DateTime?    @map("approved_at") @db.Timestamptz
+  sentAt                 DateTime?    @map("sent_at") @db.Timestamptz
+  deliveredAt            DateTime?    @map("delivered_at") @db.Timestamptz
+  createdAt              DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  scheduleOfValues LienScheduleOfValue @relation(fields: [lienScheduleOfValuesId], references: [id])
+  workMonth        WorkMonth?          @relation(fields: [workMonthId], references: [id])
+  recipients       NoticeRecipient[]
+  mailingRecord    MailingRecord?
+
+  @@index([orgId], map: "notices_org_id_idx")
+  @@index([lienScheduleOfValuesId], map: "notices_lien_schedule_of_values_id_idx")
+  @@map("notices")
+}
+
+model NoticeRecipient {
+  id             String              @id @default(uuid())
+  orgId          String              @map("org_id")
+  noticeId       String              @map("notice_id")
+  recipientType  NoticeRecipientType @map("recipient_type")
+  legalName      String              @map("legal_name")
+  mailingAddress String              @map("mailing_address")
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  notice Notice @relation(fields: [noticeId], references: [id])
+
+  @@index([orgId], map: "notice_recipients_org_id_idx")
+  @@index([noticeId], map: "notice_recipients_notice_id_idx")
+  @@map("notice_recipients")
+}
+
+model LienFiling {
+  id                       String       @id @default(uuid())
+  orgId                    String       @map("org_id")
+  lienScheduleOfValuesId   String       @unique @map("lien_schedule_of_values_id")
+  status                   FilingStatus @default(not_filed)
+  affidavitDocUrl          String?      @map("affidavit_doc_url")
+  county                   String?
+  filingDate               DateTime?    @map("filing_date") @db.Timestamptz
+  recordingRef             String?      @map("recording_ref")
+  filingFee                Decimal?     @map("filing_fee") @db.Decimal(10, 2)
+  postFilingNoticeDeadline DateTime?    @map("post_filing_notice_deadline") @db.Timestamptz
+  enforcementDeadline      DateTime?    @map("enforcement_deadline") @db.Timestamptz
+  createdAt                DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  scheduleOfValues LienScheduleOfValue @relation(fields: [lienScheduleOfValuesId], references: [id])
+  release          LienRelease?
+  mailingRecord    MailingRecord?
+
+  @@index([orgId], map: "lien_filings_org_id_idx")
+  @@map("lien_filings")
+}
+
+model MailingRecord {
+  id             String    @id @default(uuid())
+  orgId          String    @map("org_id")
+  noticeId       String?   @unique @map("notice_id")
+  filingId       String?   @unique @map("filing_id")
+  provider       String    @default("shippo")
+  trackingNumber String?   @map("tracking_number")
+  labelUrl       String?   @map("label_url")
+  sentDate       DateTime? @map("sent_date") @db.Timestamptz
+  proofUrl       String?   @map("proof_url")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  notice Notice?     @relation(fields: [noticeId], references: [id])
+  filing LienFiling? @relation(fields: [filingId], references: [id])
+
+  @@index([orgId], map: "mailing_records_org_id_idx")
+  @@map("mailing_records")
+}
+
+model LienRelease {
+  id                 String        @id @default(uuid())
+  orgId              String        @map("org_id")
+  filingId           String        @unique @map("filing_id")
+  status             ReleaseStatus @default(not_required)
+  requestedAt        DateTime?     @map("requested_at") @db.Timestamptz
+  generatedDocUrl    String?       @map("generated_doc_url")
+  signedDate         DateTime?     @map("signed_date") @db.Timestamptz
+  filingConfirmation String?       @map("filing_confirmation")
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  filing LienFiling @relation(fields: [filingId], references: [id])
+
+  @@index([orgId], map: "lien_releases_org_id_idx")
+  @@map("lien_releases")
+}
+
+model Waiver {
+  id                    String               @id @default(uuid())
+  orgId                 String               @map("org_id")
+  lienProjectId         String               @map("lien_project_id")
+  workStream            WorkStream           @map("work_stream")
+  waiverType            WaiverType           @map("waiver_type")
+  paymentAmount         Decimal              @map("payment_amount") @db.Decimal(12, 2)
+  approvalStatus        WaiverApprovalStatus @default(not_required) @map("approval_status")
+  pmApprovedByUserId    String?              @map("pm_approved_by_user_id") // Clerk user id (was loose ref to users; no FK in Drizzle)
+  pmApprovedAt          DateTime?            @map("pm_approved_at") @db.Timestamptz
+  financeApprovedByUserId String?            @map("finance_approved_by_user_id") // Clerk user id (was loose ref to users; no FK in Drizzle)
+  financeApprovedAt     DateTime?            @map("finance_approved_at") @db.Timestamptz
+  notarized             Boolean              @default(false)
+  notaryLiveRef         String?              @map("notary_live_ref")
+  signedDate            DateTime?            @map("signed_date") @db.Timestamptz
+  invoiceLinkId         String?              @map("invoice_link_id") // loose ref to invoice_links (no FK in Drizzle)
+  generatedDocUrl       String?              @map("generated_doc_url")
+  providedToGc          Boolean              @default(false) @map("provided_to_gc")
+  createdAt             DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+
+  lienProject LienProject @relation(fields: [lienProjectId], references: [id])
+
+  @@index([orgId], map: "waivers_org_id_idx")
+  @@index([lienProjectId], map: "waivers_lien_project_id_idx")
+  @@map("waivers")
+}
+
+model SupplierNoticeRisk {
+  id              String                   @id @default(uuid())
+  orgId           String                   @map("org_id")
+  lienProjectId   String                   @map("lien_project_id")
+  invoiceLinkId   String                   @map("invoice_link_id") // loose ref to invoice_links (no FK in Drizzle)
+  status          SupplierNoticeRiskStatus @default(none)
+  supplierDeadline DateTime                @map("supplier_deadline") @db.Timestamptz
+  beaconDeadline  DateTime                 @map("beacon_deadline") @db.Timestamptz
+  monthAffected   DateTime                 @map("month_affected") @db.Timestamptz
+  createdAt       DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime                 @updatedAt @map("updated_at") @db.Timestamptz
+
+  lienProject LienProject @relation(fields: [lienProjectId], references: [id])
+
+  @@index([orgId], map: "supplier_notice_risks_org_id_idx")
+  @@index([lienProjectId], map: "supplier_notice_risks_lien_project_id_idx")
+  @@map("supplier_notice_risks")
+}
+
+// ---------------------------------------------------------------------------
+// 2.5 Collections Models
+// ---------------------------------------------------------------------------
+
+model DunningSequence {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  steps              DunningStep[]
+  collectionAccounts CollectionAccount[]
+
+  @@index([orgId], map: "dunning_sequences_org_id_idx")
+  @@map("dunning_sequences")
+}
+
+model DunningStep {
+  id          String          @id @default(uuid())
+  orgId       String          @map("org_id")
+  sequenceId  String          @map("sequence_id")
+  stepType    DunningStepType @map("step_type")
+  daysOverdue Int             @map("days_overdue")
+  order       Int
+  templateRef String?         @map("template_ref")
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+
+  sequence           DunningSequence     @relation(fields: [sequenceId], references: [id])
+  collectionAccounts CollectionAccount[] @relation("CurrentDunningStep")
+
+  @@index([orgId], map: "dunning_steps_org_id_idx")
+  @@index([sequenceId], map: "dunning_steps_sequence_id_idx")
+  @@map("dunning_steps")
+}
+
+model CollectionAccount {
+  id                  String           @id @default(uuid())
+  orgId               String           @map("org_id")
+  linkedClientId      String           @unique @map("linked_client_id")
+  status              CollectionStatus @default(current)
+  escalationStage     EscalationStage  @default(none) @map("escalation_stage")
+  totalOverdue        Decimal          @default(0) @map("total_overdue") @db.Decimal(12, 2)
+  oldestOverdueDays   Int              @default(0) @map("oldest_overdue_days")
+  riskScore           Int?             @map("risk_score")
+  dunningSequenceId   String?          @map("dunning_sequence_id")
+  currentDunningStepId String?         @map("current_dunning_step_id")
+  createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+
+  linkedClient       LinkedClient         @relation(fields: [linkedClientId], references: [id])
+  dunningSequence    DunningSequence?     @relation(fields: [dunningSequenceId], references: [id])
+  currentDunningStep DunningStep?         @relation("CurrentDunningStep", fields: [currentDunningStepId], references: [id])
+  activities         CollectionActivity[]
+  promisesToPay      PromiseToPay[]
+  paymentPlans       PaymentPlan[]
+
+  @@index([orgId], map: "collection_accounts_org_id_idx")
+  @@map("collection_accounts")
+}
+
+model RiskScoreConfig {
+  id        String   @id @default(uuid())
+  orgId     String   @map("org_id")
+  config    Json
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([orgId], map: "risk_score_configs_org_id_idx")
+  @@map("risk_score_configs")
+}
+
+model CollectionActivity {
+  id                String                   @id @default(uuid())
+  orgId             String                   @map("org_id")
+  accountId         String                   @map("account_id")
+  method            CollectionActivityMethod
+  activityDate      DateTime                 @map("activity_date") @db.Timestamptz
+  notes             String?
+  hubspotActivityId String?                  @map("hubspot_activity_id")
+  createdByUserId   String?                  @map("created_by_user_id") // Clerk user id (was loose ref to users; no FK in Drizzle)
+  createdAt         DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime                 @updatedAt @map("updated_at") @db.Timestamptz
+
+  account CollectionAccount @relation(fields: [accountId], references: [id])
+
+  @@index([orgId], map: "collection_activities_org_id_idx")
+  @@index([accountId], map: "collection_activities_account_id_idx")
+  @@map("collection_activities")
+}
+
+model PromiseToPay {
+  id           String        @id @default(uuid())
+  orgId        String        @map("org_id")
+  accountId    String        @map("account_id")
+  amount       Decimal       @db.Decimal(12, 2)
+  promisedDate DateTime      @map("promised_date") @db.Timestamptz
+  status       PromiseStatus @default(open)
+  notes        String?
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  account CollectionAccount @relation(fields: [accountId], references: [id])
+
+  @@index([orgId], map: "promises_to_pay_org_id_idx")
+  @@index([accountId], map: "promises_to_pay_account_id_idx")
+  @@map("promises_to_pay")
+}
+
+model PaymentPlan {
+  id          String            @id @default(uuid())
+  orgId       String            @map("org_id")
+  accountId   String            @map("account_id")
+  status      PaymentPlanStatus @default(active)
+  totalAmount Decimal           @map("total_amount") @db.Decimal(12, 2)
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz
+
+  account      CollectionAccount        @relation(fields: [accountId], references: [id])
+  installments PaymentPlanInstallment[]
+
+  @@index([orgId], map: "payment_plans_org_id_idx")
+  @@index([accountId], map: "payment_plans_account_id_idx")
+  @@map("payment_plans")
+}
+
+model PaymentPlanInstallment {
+  id        String    @id @default(uuid())
+  orgId     String    @map("org_id")
+  planId    String    @map("plan_id")
+  dueDate   DateTime  @map("due_date") @db.Timestamptz
+  amount    Decimal   @db.Decimal(12, 2)
+  paid      Boolean   @default(false)
+  paidDate  DateTime? @map("paid_date") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  plan PaymentPlan @relation(fields: [planId], references: [id])
+
+  @@index([orgId], map: "payment_plan_installments_org_id_idx")
+  @@index([planId], map: "payment_plan_installments_plan_id_idx")
+  @@map("payment_plan_installments")
+}
+
+// ---------------------------------------------------------------------------
+// 2.5b Document Templates
+// ---------------------------------------------------------------------------
+
+model DocumentTemplate {
+  id              String   @id @default(uuid())
+  orgId           String   @map("org_id")
+  documentType    String   @map("document_type")
+  branding        String?
+  intro           String?
+  closing         String?
+  signature       String?
+  footer          String?
+  updatedByUserId String?  @map("updated_by_user_id") // Clerk user id (was loose ref to users; no FK in Drizzle)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([orgId, documentType], map: "document_templates_org_type_uq")
+  @@index([orgId], map: "document_templates_org_id_idx")
+  @@map("document_templates")
+}
+
+// ---------------------------------------------------------------------------
+// 2.6 Cross-Cutting Models
+// ---------------------------------------------------------------------------
+
+model Hold {
+  id                String    @id @default(uuid())
+  orgId             String    @map("org_id")
+  holdType          HoldType  @map("hold_type")
+  lienProjectId     String?   @map("lien_project_id")
+  linkedClientId    String?   @map("linked_client_id")
+  supplierInvoiceId String?   @map("supplier_invoice_id")
+  reason            String
+  setAt             DateTime  @default(now()) @map("set_at") @db.Timestamptz
+  clearedAt         DateTime? @map("cleared_at") @db.Timestamptz
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  lienProject  LienProject?  @relation(fields: [lienProjectId], references: [id])
+  linkedClient LinkedClient? @relation(fields: [linkedClientId], references: [id])
+
+  @@index([orgId], map: "holds_org_id_idx")
+  @@index([supplierInvoiceId], map: "holds_supplier_invoice_id_idx")
+  @@map("holds")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  orgId       String   @map("org_id")
+  actorUserId String?  @map("actor_user_id") // Clerk user id (was loose ref to users; null = system action)
+  actorRole   String?  @map("actor_role")
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String?  @map("entity_id")
+  summary     String
+  before      Json?
+  after       Json?
+  details     Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([orgId], map: "audit_logs_org_id_idx")
+  @@index([entityType, entityId], map: "audit_logs_entity_idx")
+  @@index([action], map: "audit_logs_action_idx")
+  @@index([createdAt], map: "audit_logs_created_at_idx")
+  @@map("audit_logs")
+}

@@ -1,0 +1,10 @@
+# Beacon platform monorepo (pnpm workspaces). Task runner deferred (Nx-leaning) until ~8+ pkgs.
+packages:
+  - packages/*
+  - modules/*
+  - apps/*
+
+# Supply-chain defense: require packages to be >=1 day old before install (carried from LienGuard).
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - '@replit/*'
