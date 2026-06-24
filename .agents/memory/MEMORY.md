@@ -1,0 +1,27 @@
+- [Drizzle over Prisma](drizzle-prisma-decision.md) — workspace uses Drizzle ORM not Prisma; all schema/queries must use Drizzle.
+- [Seed runner](seed-runner.md) — `tsx` is not in PATH; run TypeScript seed scripts with `pnpm dlx tsx <file>` from the package dir.
+- [lib/db declarations](lib-db-build.md) — run `pnpm --filter @workspace/db exec tsc -p tsconfig.json` before typechecking api-server to generate .d.ts so TS project-references resolve.
+- [Replit proxy prefix passthrough](replit-proxy-prefix.md) — Replit artifact-router does NOT strip path prefixes; all API server routes must include /api/* to match what the proxy delivers.
+- [Phase 3 deadline engine](phase3-deadline-engine.md) — Texas § 53.003(e) business-day engine verified: Mar 2026 notice→Jun 15, retainage Feb 14(Sat) skips Presidents' Day(Feb 16)→Feb 17.
+- [Express sub-router path doubling](router-path-mounting.md) — when a router is mounted at /api/monthly, its handlers must use /run not /monthly/run; doubled path = silent 404.
+- [Replit cartographer + generic JSX](cartographer-generic-jsx.md) — cartographer plugin breaks on <Component<T> syntax; remove explicit type param and let TypeScript infer from props.
+- [Waivers route order](waivers-route-order.md) — GET /waivers/exposure must be declared BEFORE GET /waivers/:id in the router to avoid Express collision.
+- [Express 5 params strict typing](express5-params-strict.md) — req.params fields type as string|string[]; Drizzle eq() with strict enum columns rejects this; cast with `req.params["id"] as string`.
+- [Shippo stub fallback](third-party-stubs.md) — Shippo client stubs when SHIPPO_API_KEY absent; real key activates live calls. (NotaryLive no longer stubs — see notarylive-v3.md.)
+- [Session lib no requireRole](session-no-requirerole.md) — no requireRole() exported from session.ts; inline admin check via `getSession(req).role !== "admin"` → 403.
+- [Auth gate architecture](auth-gate-architecture.md) — login gate is server-driven via GET /api/auth/user; AUTH_BYPASS=1 (dev only) injects synthetic admin to bypass it.
+- [Dev bypass role from DB](dev-bypass-role-from-db.md) — /api/auth/user reads role from seeded DB user, not BYPASS_USERS; post-merge schema sync wipes roles → re-run seed-uat.ts if editing breaks.
+- [Authenticated screenshots](screenshot-dev-session.md) — web app now uses real Replit Auth; dev-session priming is gone, screenshots always show the login gate. Roles live in users.role.
+- [Seed drift vs recompute](seed-drift-recompute.md) — collections/stream status & escalationStage are recomputed at runtime; seeds using onConflictDoNothing can't reset drifted rows, so re-assert canonical states with explicit UPDATEs.
+- [Bill-based vendor holds](bill-based-holds.md) — holds connect to a specific vendor bill via holds.supplierInvoiceId; never hold cleared bills; engine ignores legacy null-bill holds.
+- [api-zod is a built project ref](lib-db-build.md) — like lib/db, lib/api-zod needs `tsc -p tsconfig.json` to refresh dist/.d.ts; stale dist causes phantom "has no exported member" errors in api-server.
+- [wouter component reuse](wouter-component-reuse.md) — wouter reuses (not remounts) a route component on param/query change; URL-derived state needs a useEffect to resync, not just mount-time init.
+- [NotaryLive v3](notarylive-v3.md) — real v3 API contract + sandbox behavior; no webhook, completion is polled; never reintroduce a webhook completion path.
+- [Rich-text region roundtrip](richtext-region-roundtrip.md) — template regions support b/i/u markup; plain defaults must roundtrip byte-identically or null-storage breaks; tokens-in-format normalize harmlessly.
+- [API test harness](api-test-harness.md) — api-server uses Vitest+Supertest in test/; NODE_ENV=test auto-flips AUTH_BYPASS; pool closed per-file in setup.
+- [Profile & theme architecture](profile-theme-architecture.md) — avatar separate from synced image; prefs read fresh from DB not session; theme = server source-of-truth + localStorage no-flash cache on <html>.
+- [UAT e2e suite](uat-e2e-suite.md) — api-server `test:uat` harness: delete AUTH_BYPASS before importing app, per-test precondition resets for idempotency, assert runtime-derived statuses not stored seed values.
+- [AuthUser role passthrough](authuser-role-passthrough.md) — frontend role is gated by the AuthUser OpenAPI schema; GetCurrentAuthUserResponse.parse strips any field not in the schema, so role must be declared there + codegen rerun.
+- [Role is DB-authoritative](authuser-role-field.md) — resolve users.role from DB per-request (session copy goes stale); role rides OpenAPI AuthUser for UI gating (rerun codegen); role===null = no-access-yet.
+- [Invite/add-user claim flow](invite-claim-flow.md) — admin pre-creates user by email (placeholder uuid id); login adopts real OIDC sub onto that row (email-unique blocks naive insert); emails lowercased both sides.
+- [zod not in api-server](api-server-zod.md) — api-server has no direct zod dep and api-zod doesn't re-export z; hand-roll request validation or add zod (catalog:) first.

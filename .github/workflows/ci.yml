@@ -1,0 +1,126 @@
+name: CI
+
+# Quality gate for LienGuard. Runs on every PR to main and on pushes to main.
+# This is the gate that was missing when an incomplete LienStream -> SOV rename
+# shipped a workspace that did not typecheck. Keep typecheck + build required.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref to save minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lienguard_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Postgres service created above.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/lienguard_test
+      # The web + mockup vite configs require PORT/BASE_PATH at config-load time
+      # (Replit injects these). Provide them so `build` can run in CI.
+      PORT: "19800"
+      BASE_PATH: /
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (whole workspace)
+        run: pnpm run typecheck
+
+      - name: Build (whole workspace)
+        run: pnpm run build
+
+      - name: Push DB schema
+        run: pnpm --filter @workspace/db run push
+
+      - name: API tests
+        run: pnpm --filter @workspace/api-server run test
+
+  # End-to-end UAT harness: seeds a full DB (base + phase5/6 + UAT fixtures) and
+  # drives the real Express app through the lien/collections workflows with
+  # per-role DB-backed sessions. Kept as a SEPARATE job (not yet a required
+  # check) so its seed-heavy, longer run can be stabilized before gating merges.
+  # Promote it to a required status check once it's reliably green.
+  uat-e2e:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lienguard_uat
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/lienguard_uat
+      # UAT exercises the real auth/role gates. NODE_ENV must NOT be "test"
+      # (that auto-enables AUTH_BYPASS and defeats the 401/403 assertions) nor
+      # "production" (the harness refuses to run there). "development" keeps the
+      # real gates active while leaving the DD-04 legal-review gate relaxed.
+      NODE_ENV: development
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Push DB schema
+        run: pnpm --filter @workspace/db run push
+
+      - name: Seed + run UAT e2e harness
+        run: pnpm --filter @workspace/api-server run test:uat

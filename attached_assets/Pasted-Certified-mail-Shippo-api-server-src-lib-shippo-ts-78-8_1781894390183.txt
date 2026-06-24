@@ -1,0 +1,14 @@
+Certified mail (Shippo) — api-server/src/lib/shippo.ts:78-83. Returns a fake tracking number and a dummy S3 PDF URL. No real label is bought or mailed.
+Notarization (NotaryLive) — api-server/src/lib/notarylive.ts:42-46. Returns a fake signing session and a notarylive.com URL that isn't a real session.
+HubSpot sync (read) — api-server/src/lib/clients/hubspot.ts:35-108,185-224. When no key is set, all projects/companies come from hardcoded FIXTURE_PROJECTS / FIXTURE_COMPANIES, not your CRM.
+HubSpot activity write — hubspot.ts:232-234. postActivity always returns a fake hs_act_stub_… ID — the live "create note" call was never implemented, even with a key.
+QuickBooks (QBO) aging sync — api-server/src/routes/collections.ts:208-216. The "refresh from QBO" just bumps a lastSyncedAt timestamp to pretend it synced. It never calls the QBO API.
+Backend logic that's stubbed
+Lien affidavit document URL — api-server/src/routes/filing.ts:268-299. The stored affidavit reference is a fake generated://filing/.../affidavit.pdf string, not a real saved file. (A PDF is generated on-the-fly in a separate GET route, but nothing is persisted to storage.)
+HubSpot project→stream sync — api-server/src/routes/external.ts:29,114. Marked "Phase 0: returns fixture/seeded data." The stream-sync endpoint returns an empty streams: [] — the wiring isn't built.
+Frontend placeholders
+Global search bar — lien-collections/src/components/nav/AppShell.tsx:283. The "Search projects…" box in the top nav has no handler at all. Typing does nothing.
+Dashboard "days remaining/overdue" — lien-collections/src/pages/dashboard.tsx:50-52,111. These numbers come from a hardcoded DAYS_FAKE lookup keyed by status, not from the real statutory deadline engine. (The deadline engine itself is real and works — the dashboard just isn't using it.)
+Config → Integrations tab — lien-collections/src/pages/config.tsx:934-1038. Only QBO connection status is handled; the "future connections" are UI scaffolding only.
+Not fake, just scoped to Texas (worth knowing)
+The jurisdiction/statute engine references "future states" in the UI (config.tsx:796) but only Texas Ch. 53 is actually implemented. That's by design, not a broken placeholder.

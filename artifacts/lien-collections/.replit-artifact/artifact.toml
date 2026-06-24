@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "LiensEasy by HELM"
+version = "1.0.0"
+id = "artifacts/lien-collections"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19800
+
+[services.development]
+run = "pnpm --filter @workspace/lien-collections run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/lien-collections", "run", "build" ]
+publicDir = "artifacts/lien-collections/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19800"
+BASE_PATH = "/"
