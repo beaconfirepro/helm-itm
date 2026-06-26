@@ -1,0 +1,26 @@
+name: CI
+
+# Test signal for the addon on every push to main and every PR. Deploys are
+# handled by Vercel's native Git integration (this workflow does not deploy).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: addon unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Installs all workspaces (addon + demo) and links the local addon.
+      - run: npm ci
+
+      # 53 unit tests — node --test in storybook-addon-auto-detect.
+      - run: npm run test:addon
