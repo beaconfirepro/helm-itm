@@ -1,0 +1,71 @@
+{
+  "version": 1,
+  "components": {
+    "src/components/Avatar.tsx::Avatar": {
+      "status": "surfaced",
+      "generatedHash": "2981b1e46fba",
+      "edited": false,
+      "file": "src/components/Avatar.tsx",
+      "drifted": false,
+      "updatedAt": "2026-06-24T09:43:49.799Z",
+      "signedHash": "46a8efab84bd"
+    },
+    "src/components/Badge.tsx::Badge": {
+      "status": "approved",
+      "generatedHash": "ba8f953a3eb0",
+      "edited": false,
+      "file": "src/components/Badge.tsx",
+      "drifted": false,
+      "updatedAt": "2026-06-24T12:48:28.952Z",
+      "signedHash": "cf8193d49b47",
+      "fixOutside": false
+    },
+    "src/components/Button.tsx::Button": {
+      "status": "approved",
+      "generatedHash": "02279f52a96b",
+      "edited": false,
+      "file": "src/components/Button.tsx",
+      "updatedAt": "2026-06-24T06:14:02.741Z",
+      "drifted": false
+    },
+    "src/components/Card.tsx::Card": {
+      "status": "approved",
+      "generatedHash": "2861f965bd2b",
+      "edited": false,
+      "file": "src/components/Card.tsx",
+      "drifted": false,
+      "updatedAt": "2026-06-24T09:51:46.241Z",
+      "signedHash": "461a42d4edfe"
+    },
+    "src/components/Spinner.tsx::Spinner": {
+      "status": "surfaced",
+      "generatedHash": null,
+      "edited": false,
+      "drifted": false
+    },
+    "src/components/LegacyButton.tsx::LegacyButton": {
+      "status": "approved",
+      "generatedHash": "1c4047ed2924",
+      "edited": false,
+      "file": "src/components/LegacyButton.tsx",
+      "drifted": false,
+      "updatedAt": "2026-06-26T15:53:52.974Z",
+      "signedHash": "5aa002a41a8d"
+    },
+    "src/components/RadioToggle.tsx::RadioToggle": {
+      "status": "surfaced",
+      "generatedHash": "50cc9c28c880",
+      "edited": false,
+      "file": "src/components/RadioToggle.tsx",
+      "drifted": false,
+      "fixOutside": false
+    },
+    "src/components/Tag.tsx::Tag": {
+      "status": "surfaced",
+      "generatedHash": "27b17cef8562",
+      "edited": false,
+      "drifted": false,
+      "file": "src/components/Tag.tsx"
+    }
+  }
+}

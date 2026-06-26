@@ -1,0 +1,50 @@
+{
+  "name": "storybook-addon-auto-detect",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Auto-detect components in a codebase and generate Storybook stories for them — no manual .stories files required.",
+  "keywords": [
+    "storybook",
+    "storybook-addon",
+    "addon",
+    "stories",
+    "codegen",
+    "auto"
+  ],
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.js",
+    "./preset": "./preset.js",
+    "./manager": "./manager.jsx",
+    "./package.json": "./package.json"
+  },
+  "main": "./src/index.js",
+  "bin": {
+    "auto-detect-governance": "./bin/governance.js",
+    "auto-detect-design-review": "./bin/design-review.js",
+    "auto-detect-audit": "./bin/audit.js",
+    "auto-detect-apply": "./bin/apply.js"
+  },
+  "files": [
+    "src",
+    "bin",
+    "preset.js",
+    "manager.jsx",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.25.0",
+    "react-docgen": "^7.1.1"
+  },
+  "peerDependencies": {
+    "storybook": ">=9.0.0"
+  },
+  "peerDependenciesMeta": {
+    "storybook": {
+      "optional": true
+    }
+  }
+}

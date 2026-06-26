@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm -v)",
+      "Bash(npm ping *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(node_modules/.bin/storybook --version)",
+      "Bash(../node_modules/.bin/storybook build *)",
+      "Bash(node -e ' *)",
+      "Bash(node --input-type=module -e ' *)",
+      "Bash(cd \"C:/Users/beacon/projects/outliner\" && rm -f demo/src/components/*.auto.stories.jsx && rm -rf demo/storybook-static && echo \"cleaned\" && ls demo/src/components/)",
+      "Bash(node -e \"try{require.resolve\\('storybook/manager-api'\\);console.log\\('storybook/manager-api OK'\\)}catch\\(e\\){console.log\\('NO storybook/manager-api'\\)}\")",
+      "Bash(node -e \"try{require.resolve\\('@storybook/components'\\);console.log\\('@storybook/components OK'\\)}catch\\(e\\){console.log\\('NO @storybook/components'\\)}\")",
+      "Bash(node -e \"try{require.resolve\\('storybook/internal/components'\\);console.log\\('storybook/internal/components OK'\\)}catch\\(e\\){console.log\\('NO internal/components'\\)}\")",
+      "Bash(echo \"exit=$?\")",
+      "Read(//tmp/**)",
+      "Bash(mkdir -p /tmp/bak)",
+      "Bash(cp src/App.tsx src/pages/Dashboard.tsx src/pages/Settings.tsx /tmp/bak/)",
+      "Bash(node ../addon/bin/governance.js approve Button)",
+      "Bash(node ../addon/bin/audit.js)",
+      "Bash(node ../addon/bin/apply.js --dry)",
+      "Bash(node ../addon/bin/apply.js)",
+      "Bash(cp /tmp/bak/App.tsx src/App.tsx)",
+      "Bash(cp /tmp/bak/Dashboard.tsx src/pages/Dashboard.tsx)",
+      "Bash(cp /tmp/bak/Settings.tsx src/pages/Settings.tsx)",
+      "Bash(rm -f .storybook/conformance-report.json)"
+    ]
+  }
+}

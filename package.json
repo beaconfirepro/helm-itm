@@ -1,0 +1,15 @@
+{
+  "name": "outliner-auto-detect-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Workspace for storybook-addon-auto-detect and its React demo app.",
+  "workspaces": [
+    "addon",
+    "demo"
+  ],
+  "scripts": {
+    "storybook": "npm run storybook --workspace demo",
+    "build-storybook": "npm run build-storybook --workspace demo",
+    "test:addon": "npm run test --workspace storybook-addon-auto-detect"
+  }
+}

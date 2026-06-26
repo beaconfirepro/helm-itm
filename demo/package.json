@@ -1,0 +1,31 @@
+{
+  "name": "auto-detect-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "storybook": "storybook dev -p 6107 --no-open",
+    "build-storybook": "storybook build",
+    "governance": "node ../addon/bin/governance.js",
+    "design-review": "node ../addon/bin/design-review.js",
+    "conformance:audit": "node ../addon/bin/audit.js",
+    "conformance:apply": "node ../addon/bin/apply.js"
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "prop-types": "^15.8.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@storybook/addon-docs": "^10.0.0",
+    "@storybook/react-vite": "^10.0.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "storybook": "^10.0.0",
+    "tailwindcss": "^4.0.0",
+    "storybook-addon-auto-detect": "*",
+    "typescript": "^5.6.0",
+    "vite": "^7.0.0"
+  }
+}

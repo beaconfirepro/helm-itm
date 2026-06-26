@@ -1,0 +1,12 @@
+node_modules/
+dist/
+storybook-static/
+*.log
+
+# Auto-generated story files (filesystem output mode). They carry a banner so
+# they are easy to spot; ignored so generated output never lands in version control.
+*.auto.stories.jsx
+*.auto.stories.tsx
+
+# Generated Tailwind token stylesheet
+auto-theme.css

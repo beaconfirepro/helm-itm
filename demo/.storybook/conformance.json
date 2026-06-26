@@ -1,0 +1,17 @@
+{
+  "managed": {
+    "Button": [
+      "variant",
+      "size"
+    ],
+    "Card": [
+      "elevated"
+    ],
+    "Badge": [
+      "tone"
+    ]
+  },
+  "rework": {
+    "RadioToggle": "Checkbox"
+  }
+}

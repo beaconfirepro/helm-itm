@@ -1,0 +1,53 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="Auto-Detect/Help" />
+
+# Auto-Detect — help
+
+This Storybook uses **`storybook-addon-auto-detect`**. It detects your components,
+surfaces them here, and lets you govern + conform them — mostly from the
+**Instances** panel (bottom), no terminal required.
+
+## What runs on every start
+
+Each time Storybook boots, the addon:
+- **discovers** components (and brand-new ones added since last time),
+- **audits** the codebase against your **approved** components (the spec), and
+- **re-groups** everything — auto and hand-written stories alike — by status:
+  **Surfaced → In Review → Approved** (and **Needs Re-review** if an approved
+  component was edited).
+
+## The Instances panel
+
+Select any component's story and open the **Instances** panel:
+
+- **Conformance** — whether it's an approved **canonical**, a **non-conforming
+  variant** (and what it should be), or flagged for **rework**.
+- **Approve & align** — marks it the canonical *and* repoints every
+  non-conforming instance to it across the repo. (Restart to re-group the sidebar.)
+- **Fix outside Storybook** — flags it as an edge case (badge); routes it to the
+  agent brief instead of auto-aligning.
+- **Managed properties** — for props the team marked managed, pick a value; the
+  component's default updates **and** every instance follows. Future drift is
+  caught on the next audit.
+- **Variants** (shadcn cva / Untitled UI `tv`) — add a new value to a variant, or
+  a whole new property, right from the panel. It's written into the component's
+  variant config; the prop and its TS type come free. (New name = new property.)
+- **Instances** — every usage site; click one to **open it in your editor**.
+
+## Configuration
+
+- Addon options live in `.storybook/main.js`.
+- Conformance config lives in `.storybook/conformance.json`:
+  - `managed`: `{ "Button": ["variant", "size"] }` — props you can govern from the UI.
+  - `rework`: `{ "RadioToggle": "Checkbox" }` — variants that need real code changes.
+  - `aliases` / `deny`: tune which variants auto-align to a canonical.
+
+## CLIs (optional — same engine, for CI)
+
+```bash
+npm run conformance:audit       # the delta vs the approved spec
+npm run conformance:apply       # align the alignable mass
+npm run governance approve X     # promote a component
+npm run design-review            # a review brief (+ PR in a git repo)
+```
