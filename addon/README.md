@@ -55,10 +55,42 @@ each with a `Default` story plus variants, tagged `auto-detected`.
 | `propDefaults` | object | `{}` | Override generated sample values per type, e.g. `{ string: 'Hello', number: 42 }`. |
 | `variantStrategy` | string | `'primary'` | `primary` = one story per enum value + boolean toggles. `combinations` = cartesian product (bounded). |
 | `outputMode` | string | `'memory'` | `memory` = inject virtual stories; `filesystem` = write `*.auto.stories.*` files. |
+| `tailwind` | boolean | `false` | Auto-wire Tailwind v4 — inject `@tailwindcss/vite` and load `tailwindcss` + the generated token theme into the preview. See [Zero-config Tailwind](#zero-config-tailwind-optional). |
 | `titlePrefix` | string | `'Auto'` | Sidebar group for generated stories. |
 | `optOutComment` | string | `'@storybook-auto-detect: off'` | A file containing this comment is skipped. |
 | `maxStoriesPerComponent` | number | `12` | Safety cap on generated stories per component. |
 | `debug` | boolean | `false` | Verbose discovery/generation logging. |
+
+## Zero-config Tailwind (optional)
+
+The token / color / spacing editors need Tailwind v4. Normally the host repo owns
+that wiring (the addon just generates the `@theme` token sheet). To skip the
+setup entirely, set `tailwind: true`:
+
+```js
+{
+  name: 'storybook-addon-auto-detect',
+  options: { framework: 'react', scanDirs: ['src/components'], tailwind: true },
+}
+```
+
+With it on, the addon:
+
+- injects the `@tailwindcss/vite` plugin into Storybook's Vite config, and
+- adds a preview entry that imports `tailwindcss` + the generated token theme,
+
+so you don't author any CSS or touch `viteFinal`. Install the (optional) peers
+once: `npm i -D tailwindcss @tailwindcss/vite`.
+
+Guarded both ways: if your repo **already** wired Tailwind, the addon detects it
+and stays out (never double-injects); if the packages aren't installed it warns
+and no-ops instead of breaking the build. It generates two files next to your
+theme output — add them to `.gitignore`:
+
+```
+auto-tailwind.css
+auto-tailwind-preview.js
+```
 
 ## How it works
 

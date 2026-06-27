@@ -21,6 +21,7 @@ import { createIndexer, createVitePlugin } from './src/virtual.js';
 import { createManualStoryIndexer } from './src/manual-indexer.js';
 import { auditConformance, summarizeByComponent } from './src/conformance.js';
 import { loadTokens, writeThemeCss, writeTokensStory } from './src/tokens.js';
+import { injectTailwind, writeTailwindPreview } from './src/tailwind.js';
 import {
   approveComponent,
   flagFixOutside,
@@ -219,7 +220,22 @@ export async function viteFinal(config, storybookOptions) {
     config.plugins = config.plugins || [];
     config.plugins.push(createVitePlugin(getComponents, adapter, options, getContext));
   }
+  // Optional: auto-wire Tailwind v4 (guarded — skips if the host already did).
+  await injectTailwind(config, options);
   return config;
+}
+
+/**
+ * When `tailwind: true`, add a preview entry that imports tailwindcss + the
+ * generated token theme, so styles actually load in the canvas without the host
+ * authoring any CSS. No-op otherwise (the host owns its own preview styles).
+ */
+export async function previewAnnotations(entries, storybookOptions) {
+  const base = entries || [];
+  const { options } = prepare(storybookOptions);
+  if (!options.enabled || !options.tailwind) return base;
+  const entry = writeTailwindPreview(options);
+  return entry ? [...base, entry] : base;
 }
 
 export async function experimental_indexers(existingIndexers, storybookOptions) {

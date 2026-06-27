@@ -29,6 +29,10 @@ export const DEFAULT_OPTIONS = {
   // Design tokens: the generated Tailwind `@theme` stylesheet is written here
   // (relative to project root). The team @imports it; the addon keeps it current.
   themeOutput: 'src/auto-theme.css',
+  // Optional: auto-wire Tailwind v4 (inject the @tailwindcss/vite plugin + load
+  // tailwindcss + the generated token theme into the preview). Off by default —
+  // the host repo owns styling unless it opts in. See src/tailwind.js.
+  tailwind: false,
   titlePrefix: 'Auto', // sidebar group when governance is disabled
   optOutComment: '@storybook-auto-detect: off',
   optInComment: '@storybook-auto-detect: on',
@@ -110,6 +114,11 @@ export function validateOptions(rawOptions = {}, { projectRoot = process.cwd() }
   if (typeof options.governanceEnabled !== 'boolean') {
     warnings.push('"governanceEnabled" must be a boolean. Using true.');
     options.governanceEnabled = true;
+  }
+
+  if (typeof options.tailwind !== 'boolean') {
+    warnings.push('"tailwind" must be a boolean. Using false.');
+    options.tailwind = false;
   }
 
   if (!Array.isArray(options.instanceScanDirs) || options.instanceScanDirs.length === 0) {
