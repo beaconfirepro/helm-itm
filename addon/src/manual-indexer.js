@@ -16,7 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadCsf } from 'storybook/internal/csf-tools';
-import { stableMetaId } from './naming.js';
+import { toId } from 'storybook/internal/csf';
 import { logger } from './logger.js';
 
 // Manual stories only — never our own *.auto.stories.* (those bake the title in).
@@ -41,8 +41,23 @@ export function createManualStoryIndexer(getComponents, options, getContext) {
           const { group } = getContext(comp);
           if (group) {
             logger.debug(`re-grouping manual story <${comp.name}> under "${group}"`);
-            const metaId = stableMetaId(comp.name);
-            return inputs.map((i) => ({ ...i, title: `${group}/${comp.name}`, metaId }));
+            // Re-group by overriding the title — but the title alone is a trap.
+            // `loadCsf` bakes `__id` from the file's ORIGINAL title (e.g.
+            // "components-spinner--small"), so the index keeps that stale id while
+            // the preview re-derives the id from the NEW title we hand it
+            // ("surfaced-spinner--small"); the two disagree and the story 404s
+            // after import. The preview always computes the id from the index
+            // entry's title (it ignores `metaId`/`__id` for that computation), so
+            // the only consistent fix is to pin `__id` to `toId(newTitle, name)`
+            // — the exact id the preview will look for. Consequence: a re-grouped
+            // manual story's URL is status-derived (it can't be status-stable
+            // without editing the team's file, which we won't do).
+            const newTitle = `${group}/${comp.name}`;
+            return inputs.map((i) => ({
+              ...i,
+              title: newTitle,
+              __id: toId(newTitle, i.name || i.exportName),
+            }));
           }
         }
       } catch (err) {
