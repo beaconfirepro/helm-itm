@@ -44,6 +44,43 @@ export default config;
 Start Storybook. Discovered components appear under the **Auto/** sidebar group,
 each with a `Default` story plus variants, tagged `auto-detected`.
 
+## Safe usage — it writes to your source
+
+When you use the governance / color / spacing / token / variant controls (or the
+`apply` / `approve` CLIs), this addon **edits your source files**. Treat it like
+any code-mod tool: **always work on a fresh branch from a clean tree.**
+
+- **Clean tree** — before you start, `git status` shows no uncommitted changes
+  (everything matches your last commit). Nothing in flight to get tangled up.
+- **Fresh branch** — make a new branch off your base first
+  (`git checkout -b design-edits`). Every edit lands there, never on `main`.
+
+That gives you three guarantees: you can **see** exactly what changed
+(`git diff`), **undo** anything instantly (`git restore <file>`), and **never
+touch `main`** until you review and merge a PR. Every edit becomes a reviewable,
+revertible diff — a sandbox with an undo button.
+
+```bash
+git checkout -b design-edits     # fresh branch
+git status                       # clean tree (verify "nothing to commit")
+npm run storybook                # edit in the Instances panel
+git diff                         # review what it wrote — every time
+git add -p && git commit         # commit deliberately
+git push -u origin design-edits  # open a PR; never push to main
+```
+
+Gitignore the generated files: `*.auto.stories.*`, `auto-theme.css`,
+`auto-tailwind.*`.
+
+Handle the broad actions with extra care (review their diffs closely):
+**Approve & align** and `conformance:apply` (repo-wide import codemod),
+**managed-prop edits** (rewrite every instance), and **set color** (a global hex
+find/replace).
+
+**Working on a repo you don't have locally?** Open it in a **GitHub Codespace**
+and run the same loop there — the Codespace has the repo, Node, and a forwarded
+port, so the editing works in the cloud and your commits/PRs come straight from it.
+
 ## Options
 
 | Option | Type | Default | Description |

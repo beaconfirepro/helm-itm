@@ -79,6 +79,14 @@ function prepare(storybookOptions) {
     );
   }
 
+  // One-line safe-usage reminder at startup — this addon writes to source on use.
+  if (options.enabled && adapter) {
+    logger.info(
+      'edits your source on use — work on a fresh branch from a clean tree and review ' +
+        '`git diff` before committing (see the README → "Safe usage").',
+    );
+  }
+
   const components = adapter ? scanComponents(adapter, options) : [];
   const instancesByComponent = adapter
     ? scanInstances(components.map((c) => c.name), options)
