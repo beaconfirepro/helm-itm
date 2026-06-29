@@ -21,6 +21,7 @@ import { createIndexer, createVitePlugin } from './src/virtual.js';
 import { createManualStoryIndexer } from './src/manual-indexer.js';
 import { auditConformance, summarizeByComponent } from './src/conformance.js';
 import { loadTokens, writeThemeCss, writeTokensStory } from './src/tokens.js';
+import { loadDtcgTokens, setDtcgToken } from './src/tokens-dtcg.js';
 import { injectTailwind, writeTailwindPreview } from './src/tailwind.js';
 import {
   approveComponent,
@@ -124,7 +125,9 @@ function prepare(storybookOptions) {
   writeThemeCss(options);
   writeTokensStory(options);
   const loadedTokens = loadTokens(configDir);
-  const tokens = loadedTokens.colors;
+  // When an external token source is configured (a team's style-dictionary
+  // file), the panel edits THAT — so surface its colors instead of ours.
+  const tokens = externalTokenColors(options) || loadedTokens.colors;
   const spacingTokens = loadedTokens.spacing || {};
   if (audit.summary.instances || audit.reworkFindings.length) {
     logger.info(
@@ -215,6 +218,18 @@ function pickAddonOptions(storybookOptions) {
     else if (storybookOptions[key] !== undefined) raw[key] = storybookOptions[key];
   }
   return raw;
+}
+
+/** Colors from the external DTCG token source, or null if not configured/readable. */
+function externalTokenColors(options) {
+  if (!options.tokensFile) return null;
+  try {
+    const file = path.resolve(options.projectRoot, options.tokensFile);
+    return loadDtcgTokens(file).colors;
+  } catch (err) {
+    logger.warn(`tokensFile: could not read ${options.tokensFile}: ${err.message}`);
+    return null;
+  }
 }
 
 export async function viteFinal(config, storybookOptions) {
@@ -377,13 +392,21 @@ export async function experimental_serverChannel(channel, storybookOptions) {
   });
 
   channel.on('auto-detect/get-tokens', () => {
-    channel.emit('auto-detect/tokens', loadTokens(configDir).colors);
+    channel.emit('auto-detect/tokens', externalTokenColors(options) || loadTokens(configDir).colors);
   });
 
   channel.on('auto-detect/set-token', ({ name, value, remove } = {}) => {
     let result;
     try {
-      result = setToken(name, value, options, { remove });
+      if (options.tokensFile) {
+        // Edit the team's real token source (+ patch the generated CSS live).
+        result = setDtcgToken(path.resolve(options.projectRoot, options.tokensFile), name, value, {
+          cssFile: options.tokensCss ? path.resolve(options.projectRoot, options.tokensCss) : undefined,
+          cssPrefix: options.tokensCssPrefix,
+        });
+      } else {
+        result = setToken(name, value, options, { remove });
+      }
     } catch (err) {
       result = { ok: false, error: err.message };
     }

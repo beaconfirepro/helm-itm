@@ -29,6 +29,13 @@ export const DEFAULT_OPTIONS = {
   // Design tokens: the generated Tailwind `@theme` stylesheet is written here
   // (relative to project root). The team @imports it; the addon keeps it current.
   themeOutput: 'src/auto-theme.css',
+  // External token source (W3C DTCG / style-dictionary). When set, the token
+  // editor reads/writes THIS file instead of the addon's own tokens.json — so a
+  // team's real design tokens are what change. `tokensCss` (+ `tokensCssPrefix`)
+  // point at the generated stylesheet to patch for an instant live recolor.
+  tokensFile: '', // e.g. 'src/tokens/helm.tokens.json'
+  tokensCss: '', // e.g. 'src/generated/tokens.css'
+  tokensCssPrefix: '--', // CSS var = `${prefix}${tokenName}`, e.g. '--ds-'
   // Optional: auto-wire Tailwind v4 (inject the @tailwindcss/vite plugin + load
   // tailwindcss + the generated token theme into the preview). Off by default —
   // the host repo owns styling unless it opts in. See src/tailwind.js.
