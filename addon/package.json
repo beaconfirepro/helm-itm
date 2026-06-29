@@ -1,6 +1,6 @@
 {
   "name": "storybook-addon-auto-detect",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Auto-detect components in a codebase and generate Storybook stories for them — no manual .stories files required.",
   "keywords": [
