@@ -4,16 +4,12 @@ import { createRoot } from 'react-dom/client';
 // Global styles (Tailwind entry + tokens + CSS modules) so components look real.
 import.meta.glob('../src/**/*.css', { eager: true });
 
-// Theme/provider wrappers from the team's Storybook preview, if present, so
-// components render in the right context. (This is the theme, not stories.)
+// Theme/provider wrappers from the team's Storybook preview, if present.
 const previewLoaders = import.meta.glob('../.storybook/preview.{js,jsx,ts,tsx}');
 
-// Components are discovered straight from the CODE — the component source files,
-// not stories. Token files are offered for editing too.
-const componentLoaders = import.meta.glob('../src/components/**/*.{tsx,jsx}');
-const tokenFiles = Object.keys(import.meta.glob('../src/tokens/**/*.json'));
-
+const COMP = /^src\/components\/.*\.(tsx|jsx)$/;
 const SKIP = /\.(stories|test|spec)\.|\/index\.|\.d\.ts$/;
+const TOKEN = /^src\/tokens\/.*\.json$/;
 
 const pascal = (file) =>
   file
@@ -22,17 +18,21 @@ const pascal = (file) =>
     .replace(/\.\w+$/, '')
     .replace(/(^|[-_ ])(\w)/g, (_, __, c) => c.toUpperCase());
 
-const isComp = (v) =>
-  typeof v === 'function' || (v && typeof v === 'object' && '$$typeof' in v);
+const isComp = (v) => typeof v === 'function' || (v && typeof v === 'object' && '$$typeof' in v);
 
-/** Find the component a source file defines: default export, or the export named
- *  like the file, or the first capitalized component export. */
 function pickComponent(mod, file) {
   if (isComp(mod.default)) return mod.default;
   const name = pascal(file);
   if (isComp(mod[name])) return mod[name];
   for (const [k, v] of Object.entries(mod)) if (/^[A-Z]/.test(k) && isComp(v)) return v;
   return null;
+}
+
+// Import a component file ON DEMAND via Vite's /@fs, so nothing is scanned up
+// front — a file with a bad import only errors its own tile, never the app.
+const fsUrl = (root, file) => '/@fs/' + root.replace(/^\//, '') + '/' + file;
+function importComponent(root, file, version) {
+  return import(/* @vite-ignore */ fsUrl(root, file) + '?t=' + version);
 }
 
 class Boundary extends React.Component {
@@ -50,31 +50,29 @@ class Boundary extends React.Component {
 }
 
 function App() {
-  const components = React.useMemo(
-    () =>
-      Object.keys(componentLoaders)
-        .filter((f) => !SKIP.test(f))
-        .map((f) => ({ kind: 'component', file: f, name: pascal(f) }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [],
-  );
-  const tokens = React.useMemo(
-    () => tokenFiles.map((f) => ({ kind: 'file', file: f, name: f.split('/').pop() })).sort((a, b) => a.name.localeCompare(b.name)),
-    [],
-  );
-
+  const [root, setRoot] = React.useState('');
+  const [components, setComponents] = React.useState([]);
+  const [tokens, setTokens] = React.useState([]);
   const [decorators, setDecorators] = React.useState([]);
-  const [sel, setSel] = React.useState(components[0] || tokens[0] || null);
+  const [sel, setSel] = React.useState(null);
   const [Rendered, setRendered] = React.useState(null);
   const [renderErr, setRenderErr] = React.useState('');
+  const [version, setVersion] = React.useState(0); // bumped on save to force re-import
 
-  // editor (bound to the selected item's own file)
   const [code, setCode] = React.useState('');
   const [clean, setClean] = React.useState('');
   const [status, setStatus] = React.useState('');
-  const srcRel = (file) => file.replace(/^\.\.\//, ''); // '../src/..' -> 'src/..'
 
+  // discover files (server-side) + preview decorators
   React.useEffect(() => {
+    fetch('/__list').then((r) => r.json()).then((d) => {
+      setRoot(d.root);
+      const comps = (d.files || []).filter((f) => COMP.test(f) && !SKIP.test(f)).map((f) => ({ kind: 'component', file: f, name: pascal(f) }));
+      const toks = (d.files || []).filter((f) => TOKEN.test(f)).map((f) => ({ kind: 'file', file: f, name: f.split('/').pop() }));
+      setComponents(comps);
+      setTokens(toks);
+      setSel(comps[0] || toks[0] || null);
+    });
     (async () => {
       for (const load of Object.values(previewLoaders)) {
         try {
@@ -84,41 +82,44 @@ function App() {
     })();
   }, []);
 
-  // When selection changes: load its source into the editor AND (if a component) render it.
+  // load source + (for components) import & render, on selection or save-bump
   React.useEffect(() => {
-    if (!sel) return;
+    if (!sel || !root) return;
+    setStatus('');
+    fetch('/__file?path=' + encodeURIComponent(sel.file)).then((r) => r.json()).then((d) => {
+      setCode(d.code || '');
+      setClean(d.code || '');
+    });
+    if (sel.kind !== 'component') {
+      setRendered(null);
+      setRenderErr('');
+      return;
+    }
     setRendered(null);
     setRenderErr('');
-    setStatus('');
-    fetch('/__file?path=' + encodeURIComponent(srcRel(sel.file)))
-      .then((r) => r.json())
-      .then((d) => {
-        setCode(d.code || '');
-        setClean(d.code || '');
-      });
-    if (sel.kind === 'component') {
-      const load = componentLoaders[sel.file];
-      load()
-        .then((mod) => {
-          const Comp = pickComponent(mod, sel.file);
-          if (!Comp) {
-            setRenderErr('No component export found in this file.');
-            return;
-          }
-          setRendered(() => Comp);
-        })
-        .catch((e) => setRenderErr(String(e?.message || e)));
-    }
-  }, [sel && sel.file]);
+    let cancelled = false;
+    importComponent(root, sel.file, version)
+      .then((mod) => {
+        if (cancelled) return;
+        const Comp = pickComponent(mod, sel.file);
+        if (!Comp) setRenderErr('No component export found in this file.');
+        else setRendered(() => Comp);
+      })
+      .catch((e) => !cancelled && setRenderErr(String(e?.message || e)));
+    return () => {
+      cancelled = true;
+    };
+  }, [sel && sel.file, root, version]);
 
   const save = () => {
     setStatus('saving…');
-    fetch('/__save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: srcRel(sel.file), code }) })
+    fetch('/__save', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: sel.file, code }) })
       .then((r) => r.json())
       .then((d) => {
         if (d.ok) {
           setClean(code);
-          setStatus('✓ saved — preview hot-reloads');
+          setStatus('✓ saved');
+          setVersion((v) => v + 1); // re-import the fresh module -> preview updates
         } else setStatus('✗ ' + (d.error || 'failed'));
       });
   };
@@ -139,25 +140,32 @@ function App() {
   else if (sel.kind !== 'component') preview = <div style={{ color: '#9ca3af' }}>No visual preview for this file — edit it on the right.</div>;
   else if (renderErr) preview = <pre style={errBox}>{renderErr}</pre>;
   else if (Rendered) {
-    const base = () => React.createElement(Rendered, {}, sel.name);
-    let fn = base;
+    let fn = () => React.createElement(Rendered, {}, sel.name);
     for (const d of decorators) {
       const inner = fn;
       fn = () => d(inner, { args: {}, globals: {}, parameters: {} });
     }
-    preview = <Boundary resetKey={sel.file}>{(() => { try { return fn(); } catch (e) { return <pre style={errBox}>{String(e?.stack || e)}</pre>; } })()}</Boundary>;
+    preview = (
+      <Boundary resetKey={sel.file + version}>
+        {(() => {
+          try {
+            return fn();
+          } catch (e) {
+            return <pre style={errBox}>{String(e?.stack || e)}</pre>;
+          }
+        })()}
+      </Boundary>
+    );
   } else preview = <div style={{ color: '#9ca3af' }}>rendering…</div>;
 
-  const Item = ({ it }) => (
-    <div onClick={() => setSel(it)} style={row(sel && sel.file === it.file)}>{it.name}</div>
-  );
+  const Item = ({ it }) => <div onClick={() => setSel(it)} style={row(sel && sel.file === it.file)}>{it.name}</div>;
 
   return (
     <div style={{ display: 'flex', height: '100%', fontSize: 13 }}>
       <div style={{ width: 230, borderRight: '1px solid #e5e7eb', overflow: 'auto', flexShrink: 0 }}>
         <div style={hd}>Components</div>
         {components.map((it) => <Item key={it.file} it={it} />)}
-        {components.length === 0 && <div style={{ padding: 12, color: '#9ca3af' }}>No components found in src/components.</div>}
+        {components.length === 0 && <div style={{ padding: 12, color: '#9ca3af' }}>No components in src/components.</div>}
         {tokens.length > 0 && <div style={grp}>Tokens</div>}
         {tokens.map((it) => <Item key={it.file} it={it} />)}
       </div>
@@ -169,7 +177,7 @@ function App() {
 
       <div style={{ width: 480, borderLeft: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         <div style={{ ...bar, justifyContent: 'space-between' }}>
-          <code style={{ fontSize: 12, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sel ? srcRel(sel.file) : ''}</code>
+          <code style={{ fontSize: 12, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sel ? sel.file : ''}</code>
           <button onClick={save} disabled={!sel || !dirty} style={btn(!sel || !dirty)}>Save</button>
         </div>
         <textarea
@@ -179,7 +187,7 @@ function App() {
           style={{ flex: 1, border: 0, outline: 'none', padding: 12, fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12.5, lineHeight: 1.5, whiteSpace: 'pre', resize: 'none' }}
         />
         <div style={{ padding: '6px 12px', borderTop: '1px solid #e5e7eb', color: dirty ? '#b45309' : '#6b7280', fontSize: 12 }}>
-          {status || (dirty ? 'unsaved — Ctrl/Cmd+S' : 'this is the component’s source; edits hot-reload the preview')}
+          {status || (dirty ? 'unsaved — Ctrl/Cmd+S' : 'this is the component’s source; Save re-renders the preview')}
         </div>
       </div>
     </div>

@@ -44,7 +44,7 @@ const writeback = {
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify(obj));
       };
-      if (url.pathname === '/__list') return json(200, { files: listFiles().sort() });
+      if (url.pathname === '/__list') return json(200, { root: pkg.replace(/\\/g, '/'), files: listFiles().sort() });
       if (url.pathname === '/__file') {
         const f = safe(url.searchParams.get('path'));
         if (!f || !fs.existsSync(f)) return json(404, { error: 'not found' });
