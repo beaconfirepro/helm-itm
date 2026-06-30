@@ -24,6 +24,36 @@ npm run governance approve <C>     # promote a component
 npm run design-review              # review brief (+ PR in a git repo)
 ```
 
+## Two tools in this repo
+
+1. **`addon/`** — `storybook-addon-auto-detect`: the governance/conformance/
+   token-editing Storybook addon (everything below). Best fit for inline-style
+   component libraries; on a Tailwind/shadcn system most of its visual editors
+   don't apply (no inline values), though the **DTCG token source** (`tokensFile`)
+   wires its token editor to a team's style-dictionary tokens.
+2. **`tools/workbench/`** — a standalone **visual editor** (no Storybook addon,
+   no governance). One window: the team's **real Storybook in an iframe** (left)
+   + a **code editor** (right) whose **Save** writes back to source; Storybook
+   hot-reloads. Tiny Vite app + a `/__list`/`/__file`/`/__save` middleware
+   (path-confined). See `tools/workbench/README.md`. This is where the
+   beacon-platform work landed (see below) — it renders shadcn components
+   correctly because Storybook composes them, which the addon's standalone
+   render couldn't.
+
+## beacon-platform (real-world consumer — private repo)
+
+`beaconfirepro/beacon-platform`, pnpm monorepo, `packages/design-system`
+(`@beacon/design-system`, shadcn + Radix + Tailwind v4 + style-dictionary tokens
+in `src/tokens/helm.tokens.json` → `src/generated/tokens.css`). Storybook 10.
+The **workbench** is the tool used there. Usage doc shipped as
+[beacon-platform#357](https://github.com/beaconfirepro/beacon-platform/pull/357)
+(`packages/design-system/WORKBENCH.md`). Run = two terminals (`pnpm storybook`
+on 6006 set Public + `npx vite --config workbench/vite.config.mjs --port 6007`),
+paste the forwarded Storybook URL into the workbench, edit + Save → Storybook
+reloads. The addon's DTCG token adapter (`tokensFile: src/tokens/helm.tokens.json`,
+`tokensCss: src/generated/tokens.css`, `tokensCssPrefix: --ds-`) also works there
+but the workbench is the chosen path.
+
 ## Architecture (adapter pattern, like the original auto-detect)
 
 - **`addon/preset.js`** — Storybook wiring: `viteFinal` (filesystem generation +
